@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
 	name: "LNPopupController",
 	platforms: [
-		.iOS(.v13),
+		.iOS(.v12),
 		.macCatalyst(.v13)
 	],
 	products: [
