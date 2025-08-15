@@ -13,43 +13,54 @@ import UIKit
 
 #if canImport(SwiftUI)
 import SwiftUI
+#endif
 
 @_cdecl("__ln_doNotCall__fixUIHostingViewHitTest")
 @_spi(LNPopupControllerInternal)
 public
 func __ln_doNotCall__fixUIHostingViewHitTest() {
-	DispatchQueue.main.async {
-		guard let view = UIHostingController(rootView: EmptyView()).view else {
-			return
-		}
-		
-		let cls = type(of: view)
-		let sel = #selector(UIView.hitTest(_:with:))
-		let method = class_getInstanceMethod(cls, sel)!
-		
-		let _orig: @convention(c) (_ self: UIView, _ sel: Selector, _ point: CGPoint, _ event: UIEvent?) -> UIView?
-		_orig = unsafeBitCast(method_getImplementation(method), to: type(of: _orig))
-		
-		let orig: (UIView, CGPoint, UIEvent?) -> UIView? = { _self, point, event in
-			_orig(_self, sel, point, event)
-		}
-		
-		let impl: @convention(block) (UIView, CGPoint, UIEvent?) -> UIView? = { _self, point, event in
-			if let popupContentView = _self.subviews.filter({ $0 is LNPopupContentView }).first, popupContentView.point(inside: popupContentView.convert(point, from: _self), with: event), let popupContentViewHitTest = popupContentView.hitTest(popupContentView.convert(point, from: _self), with: event) {
-				return popupContentViewHitTest
-			}
-			
-			if let popupBar = _self.subviews.filter({ $0 is LNPopupBar }).first, popupBar.point(inside: popupBar.convert(point, from: _self), with: event), let popupBarHitTest = popupBar.hitTest(popupBar.convert(point, from: _self), with: event) {
-				return popupBarHitTest
-			}
-			
-			return orig(_self, point, event)
-		}
-		
-		method_setImplementation(method, imp_implementationWithBlock(impl))
-	}
+    #if canImport(SwiftUI)
+    if #available(iOS 13.0, *) {
+        DispatchQueue.main.async {
+            let hosting = UIHostingController(rootView: EmptyView())
+            guard let view = hosting.view else { return }
+
+            let cls = type(of: view)
+            let sel = #selector(UIView.hitTest(_:with:))
+            guard let method = class_getInstanceMethod(cls, sel) else { return }
+
+            typealias COrig = @convention(c) (UIView, Selector, CGPoint, UIEvent?) -> UIView?
+            let _orig = unsafeBitCast(method_getImplementation(method), to: COrig.self)
+
+            let orig: (UIView, CGPoint, UIEvent?) -> UIView? = { _self, point, event in
+                _orig(_self, sel, point, event)
+            }
+
+            let impl: @convention(block) (UIView, CGPoint, UIEvent?) -> UIView? = { _self, point, event in
+                if let popupContentView = _self.subviews.first(where: { $0 is LNPopupContentView }),
+                   popupContentView.point(inside: popupContentView.convert(point, from: _self), with: event),
+                   let hit = popupContentView.hitTest(popupContentView.convert(point, from: _self), with: event) {
+                    return hit
+                }
+
+                if let popupBar = _self.subviews.first(where: { $0 is LNPopupBar }),
+                   popupBar.point(inside: popupBar.convert(point, from: _self), with: event),
+                   let hit = popupBar.hitTest(popupBar.convert(point, from: _self), with: event) {
+                    return hit
+                }
+
+                return orig(_self, point, event)
+            }
+
+            method_setImplementation(method, imp_implementationWithBlock(impl))
+        }
+    } else {
+        // < iOS 13: SwiftUI types don't exist → nothing to fix.
+    }
+    #else
+    // SwiftUI module not present → nothing to do.
+    #endif
 }
-#endif
 
 public
 extension Double {
